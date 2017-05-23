@@ -59,6 +59,7 @@ public class ReceiverService extends Service {
     private static final String LASTDISCONNECTEDTIME = "LASTDISCONNECTEDTIME";
 
     private static final String TAG = "AppSignin Receiver";
+    private String employeeId = "";
 
 
 
@@ -69,7 +70,7 @@ public class ReceiverService extends Service {
 
 
 
-    public static final String PATH_FILES = "http://%s:%s/files";
+    public static final String PATH_FILES = "http://%s:%s/signin/%s";
     public static final String PATH_STATUS = "http://%s:%s/status";
     public static final String PATH_FILE_DOWNLOAD = "http://%s:%s/file/%s";
 
@@ -103,6 +104,7 @@ public class ReceiverService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        employeeId = intent.getStringExtra("EmployeeId");
         m_wifiScanHandler = new WifiTasksHandler(this);
         startSenderScan();
         wifiManager.setWifiEnabled(true);
@@ -338,7 +340,7 @@ public class ReceiverService extends Service {
         Log.d(TAG, "adding files fragment with ip: " + ip);
 
         mUrlsTask = new ContactSenderAPITask(SENDER_DATA_FETCH);
-        mUrlsTask.execute(String.format(PATH_FILES, ip, senderInfo[1]));
+        mUrlsTask.execute(String.format(PATH_FILES, ip, senderInfo[1], employeeId));
     }
 
     private void onDataFetchError() {
@@ -447,6 +449,13 @@ public class ReceiverService extends Service {
                 stream.close();
             }
             Log.d(TAG, "Received output "+writer.toString());
+            final String output = writer.toString();
+            downReqHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    Toast.makeText(getApplicationContext(), "Signin request response is: "+output, Toast.LENGTH_LONG).show();
+                }
+            });
             return writer.toString();
         }
     }

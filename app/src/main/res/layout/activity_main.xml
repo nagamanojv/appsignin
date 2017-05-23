@@ -13,7 +13,7 @@
         android:id="@+id/button_send"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:onClick="sendFiles"
+        android:onClick="receiveFiles"
         android:text="Send Mode" />
 
     <Button
@@ -21,6 +21,13 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@+id/button_send"
-        android:onClick="receiveFiles"
+        android:onClick="sendFiles"
         android:text="Receive Mode" />
+
+    <EditText
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/text_empid"
+        android:layout_below="@+id/button_receive"
+        android:layout_centerHorizontal="true" />
 </RelativeLayout>

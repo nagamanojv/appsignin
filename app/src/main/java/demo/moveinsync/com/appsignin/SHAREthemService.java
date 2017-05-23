@@ -75,6 +75,8 @@ public class SHAREthemService extends Service {
     private static final int AP_ALIVE_CHECK = 100;
     private static final int AP_START_CHECK = 101;
 
+    private Handler messageHandler;
+
     static class ShareIntents {
         static final String TYPE = "type";
         static final String SHARE_SERVER_UPDATES_INTENT_ACTION = "share_server_updates_intent_action";
@@ -109,6 +111,7 @@ public class SHAREthemService extends Service {
         //Start a foreground with message saying 'Initiating Hotspot'. Message is later updated using SHARE_SERVICE_NOTIFICATION_ID
         startForeground(SHARE_SERVICE_NOTIFICATION_ID, getShareThemNotification("Initiating ShareThem Hotspot", false));
         hotspotCheckHandler = new HotspotChecker(this);
+        messageHandler = new Handler();
     }
 
     protected android.support.v7.app.NotificationCompat.Action getStopAction() {
@@ -215,7 +218,7 @@ public class SHAREthemService extends Service {
                 Log.e(TAG, " transfer cancelled for ip: " + ip + ", file name: " + fileName);
                 sendTransferStatusBroadcast(ip, 0, "Error in file transfer: " + error, fileName);
             }
-        }, filePathsTobeServed, port);
+        }, filePathsTobeServed, port, messageHandler);
         new Thread(new Runnable() {
             @Override
             public void run() {

@@ -20,8 +20,10 @@ import android.content.Intent;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.Handler;
 import android.text.TextUtils;
 import android.util.Log;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -52,6 +54,7 @@ class SHAREthemServer extends NanoHTTPD {
     private String[] m_filesTobeHosted;
     private FileTransferStatusListener m_clientsFileTransferListener;
     private Context m_context;
+    private Handler uiHandler;
 
     public SHAREthemServer(String host_name, int port) {
         super(host_name, port);
@@ -64,11 +67,12 @@ class SHAREthemServer extends NanoHTTPD {
         m_filesTobeHosted = filesToBeHosted;
     }
 
-    public SHAREthemServer(Context context, FileTransferStatusListener statusListener, String[] filesToBeHosted, int port) {
+    public SHAREthemServer(Context context, FileTransferStatusListener statusListener, String[] filesToBeHosted, int port, Handler uiHandler) {
         this(null, port);
         m_context = context;
         m_clientsFileTransferListener = statusListener;
         m_filesTobeHosted = filesToBeHosted;
+        this.uiHandler = uiHandler;
     }
 
     @Override
@@ -96,6 +100,16 @@ class SHAREthemServer extends NanoHTTPD {
                 int index = Integer.parseInt(url.replace("/file/", ""));
                 if (index != -1)
                     res = createFileResponse(m_filesTobeHosted[index], session.getHeaders().get("http-client-ip"));
+            } else if (url.contains("/signin/")) {
+                final String employeeId = url.replace("/signin/", "");
+                Log.d(TAG, "Signin request received from: "+employeeId);
+                uiHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(m_context, "Signin Request received from "+employeeId, Toast.LENGTH_LONG).show();
+                    }
+                });
+                res = createSigninConfirmResponse(employeeId);
             }
         } catch (Exception ioe) {
             ioe.printStackTrace();
@@ -134,6 +148,18 @@ class SHAREthemServer extends NanoHTTPD {
     private Response createForbiddenResponse() {
         return createErrorResponse(Response.Status.FORBIDDEN,
                 "FORBIDDEN: Reading file failed.");
+    }
+
+    private Response createSigninConfirmResponse(String employeeId) {
+        JSONObject response = new JSONObject();
+        try {
+            response.put("status", 777);
+            response.put("message", "Signin successful");
+            response.put("employeeId", employeeId);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        return new NanoHTTPD.Response(Response.Status.OK, MIME_JSON, response.toString());
     }
 
     /**

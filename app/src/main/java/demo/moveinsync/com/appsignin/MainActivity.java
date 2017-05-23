@@ -11,6 +11,7 @@ import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import java.io.File;
@@ -21,11 +22,13 @@ import demo.moveinsync.com.appsignin.utils.Utils;
 public class MainActivity extends AppCompatActivity {
 
     private static final int PERMISSIONS_REQUEST_CODE_ACCESS_COARSE_LOCATION = 100;
+    private EditText employeeIdText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        employeeIdText = (EditText) findViewById(R.id.text_empid);
     }
 
     @TargetApi(23)
@@ -68,7 +71,9 @@ public class MainActivity extends AppCompatActivity {
             builder.show();
             return;
         }
-        startService(new Intent(getApplicationContext(), ReceiverService.class));
+        Intent receiverStartIntent = new Intent(getApplicationContext(), ReceiverService.class);
+        receiverStartIntent.putExtra("EmployeeId", employeeIdText.getText().toString());
+        startService(receiverStartIntent);
     }
 
 
