@@ -126,9 +126,10 @@ public class SHAREthemService extends Service {
             String action = intent.getAction();
             switch (action) {
                 case WIFI_AP_ACTION_START:
-                    if (!hotspotControl.isEnabled()) {
-                        startFileHostingServer(intent.getStringArrayExtra(EXTRA_FILE_PATHS), intent.getIntExtra(EXTRA_PORT, 0), intent.getStringExtra(EXTRA_SENDER_NAME));
+                    if (hotspotControl.isEnabled()) {
+                        disableHotspotAndStop();
                     }
+                    startFileHostingServer(intent.getStringArrayExtra(EXTRA_FILE_PATHS), intent.getIntExtra(EXTRA_PORT, 0), intent.getStringExtra(EXTRA_SENDER_NAME));
 //                    sendAcknowledgementBroadcast(AP_ENABLED_ACKNOWLEDGEMENT);
                     break;
                 case WIFI_AP_ACTION_STOP:
