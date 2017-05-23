@@ -24,6 +24,8 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -34,7 +36,7 @@ import java.io.InputStreamReader;
 import java.util.Arrays;
 
 /**
- * A Tiny Http Server extended from {@link NanoHTTPD}. Once started, serves selected files from {@link SHAREthemActivity} on an assigned PORT.
+ * A Tiny Http Server extended from {@link NanoHTTPD}. Once started, serves selected files from {@link } on an assigned PORT.
  * <p>
  * Created by Sri on 18/12/16.
  */
@@ -118,11 +120,11 @@ class SHAREthemServer extends NanoHTTPD {
     //      For more info: https://developer.android.com/reference/android/net/wifi/WifiManager.html#enableNetwork(int, boolean)
 
     /**
-     * Creates an Error {@link com.tml.sharethem.sender.NanoHTTPD.Response} with
+     * Creates an Error {@link } with
      *
      * @param status  error Status like <code>Response.Status.FORBIDDEN</code>
      * @param message error message
-     * @return {@link com.tml.sharethem.sender.NanoHTTPD.Response}
+     * @return {@link }
      */
     private Response createErrorResponse(Response.Status status, String message) {
         Log.e(TAG, "error while creating response: " + message);
@@ -135,12 +137,20 @@ class SHAREthemServer extends NanoHTTPD {
     }
 
     /**
-     * Creates a success {@link com.tml.sharethem.sender.NanoHTTPD.Response} with Shared Files URLS data in @{@link com.google.gson.JsonArray} format
+     * Creates a success {@link } with Shared Files URLS data in @{@link com.google.gson.JsonArray} format
      *
-     * @return {@link com.tml.sharethem.sender.NanoHTTPD.Response}
+     * @return {@link }
      */
     private Response createFilePathsResponse() {
-        return new NanoHTTPD.Response(Response.Status.OK, MIME_JSON, new JSONArray(Arrays.asList(m_filesTobeHosted)).toString());
+        JSONObject response = new JSONObject();
+        try {
+            response.put("status", 1000);
+            response.put("message", "Signin successful");
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        return new NanoHTTPD.Response(Response.Status.OK, MIME_JSON, response.toString());
     }
 
     /**
@@ -148,7 +158,7 @@ class SHAREthemServer extends NanoHTTPD {
      *
      * @param clientIp Receiver IP to which Response is intended for
      * @param fileUrl  url of file among Shared files array
-     * @return {@link com.tml.sharethem.sender.NanoHTTPD.Response}
+     * @return {@link }
      * @throws IOException
      */
     private Response createFileResponse(String fileUrl, String clientIp) throws IOException {

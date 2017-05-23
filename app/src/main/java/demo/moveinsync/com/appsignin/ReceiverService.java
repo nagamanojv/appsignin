@@ -12,6 +12,7 @@ import android.net.wifi.ScanResult;
 import android.net.wifi.SupplicantState;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
@@ -22,7 +23,16 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.lang.ref.WeakReference;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.List;
 
 import demo.moveinsync.com.appsignin.utils.WifiUtils;
@@ -49,6 +59,43 @@ public class ReceiverService extends Service {
     private static final String LASTDISCONNECTEDTIME = "LASTDISCONNECTEDTIME";
 
     private static final String TAG = "AppSignin Receiver";
+
+
+
+
+
+
+
+
+
+
+    public static final String PATH_FILES = "http://%s:%s/files";
+    public static final String PATH_STATUS = "http://%s:%s/status";
+    public static final String PATH_FILE_DOWNLOAD = "http://%s:%s/file/%s";
+
+    private ContactSenderAPITask mUrlsTask;
+    private ContactSenderAPITask mStatusCheckTask;
+
+    private static String mPort, mSenderName, mSenderIp, mSenderSSID;
+
+    static final int CHECK_SENDER_STATUS = 100;
+    static final int SENDER_DATA_FETCH = 101;
+
+    private static Context appContext;
+
+    private String fileToDownload;
+
+    private volatile boolean isFileListingDone = false;
+
+    private static final int SENDER_DATA_FETCH_RETRY_LIMIT = 3;
+    private int senderDownloadsFetchRetry = SENDER_DATA_FETCH_RETRY_LIMIT, senderStatusCheckRetryLimit = SENDER_DATA_FETCH_RETRY_LIMIT;
+
+
+
+
+
+
+
 
     public ReceiverService() {
     }
@@ -226,6 +273,8 @@ public class ReceiverService extends Service {
         }
     }
 
+    Handler downReqHandler = new Handler();
+
     private class WifiScanner extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -262,7 +311,8 @@ public class ReceiverService extends Service {
                             final String ip = WifiUtils.getAccessPointIpAddress(getApplicationContext());
                             preferences.edit().putLong(LASTCONNECTEDTIME, System.currentTimeMillis()).commit();
                             Log.d(TAG, "client connected to ShareThem hot spot. AP ip address: " + ip);
-                            addSenderFilesListingFragment(ip, info.getSSID());
+                            DownloadRequestRunnable downReq = new DownloadRequestRunnable(ip, info.getSSID());
+                            downReqHandler.postDelayed(downReq, 3000);
                             //Show file selection here and allow them to send files. In our case pre-select the file. info.getSSID();
                         }
 //                        else if (!netInfo.isConnectedOrConnecting() && System.currentTimeMillis() - Prefs.getInstance().loadLong(LASTDISCONNECTEDTIME, 0) >= SYNCTIME) {
@@ -280,13 +330,125 @@ public class ReceiverService extends Service {
 
     private void addSenderFilesListingFragment(String ip, String ssid) {
         String[] senderInfo = setConnectedUi(ssid);
+        Log.d(TAG, "Adding reuqest with ip:"+ip+"  ssid:"+ssid+"  senderInfo[1]:"+senderInfo[1]);
         if (null == senderInfo) {
             Log.e(TAG, "Cant retrieve port and name info from SSID");
             return;
         }
         Log.d(TAG, "adding files fragment with ip: " + ip);
-        FilesListingFragment files_listing_fragment = FilesListingFragment.getInstance(getApplicationContext(), ip, ssid, senderInfo[0], senderInfo[1]);
-        files_listing_fragment.onCreateView();
+
+        mUrlsTask = new ContactSenderAPITask(SENDER_DATA_FETCH);
+        mUrlsTask.execute(String.format(PATH_FILES, ip, senderInfo[1]));
+    }
+
+    private void onDataFetchError() {
+        Log.d(TAG, "Server contact Receipt failed");
+    }
+
+    private void loadListing(String result) {
+        Log.d(TAG, "Received result: "+result);
+
+    }
+
+    private class ContactSenderAPITask extends AsyncTask<String, Void, String> {
+
+        int mode;
+        boolean error;
+
+        ContactSenderAPITask(int mode) {
+            this.mode = mode;
+        }
+
+        @Override
+        protected String doInBackground(String... urls) {
+            error = false;
+            try {
+                return downloadDataFromSender(urls[0]);
+            } catch (IOException e) {
+                e.printStackTrace();
+                error = true;
+                Log.e(TAG, "Exception: " + e.getMessage());
+                return null;
+            }
+        }
+
+        // onPostExecute displays the results of the AsyncTask.
+        @Override
+        protected void onPostExecute(String result) {
+            switch (mode) {
+                case SENDER_DATA_FETCH:
+                    if (error) {
+                        if (senderDownloadsFetchRetry >= 0) {
+                            --senderDownloadsFetchRetry;
+                            Log.d(TAG, "Retires = " + senderDownloadsFetchRetry);
+                            return;
+                        } else senderDownloadsFetchRetry = SENDER_DATA_FETCH_RETRY_LIMIT;
+                        onDataFetchError();
+                    } else {
+                        loadListing(result);
+                        Log.d(TAG, "File listing is done");
+                        isFileListingDone = true;
+                    }
+                    break;
+                case CHECK_SENDER_STATUS:
+                    if (error) {
+                        if (senderStatusCheckRetryLimit > 1) {
+                            --senderStatusCheckRetryLimit;
+                            Log.d(TAG, "SenderStatusCheckRetryLimit: " + senderStatusCheckRetryLimit);
+                        } else {
+                            senderStatusCheckRetryLimit = SENDER_DATA_FETCH_RETRY_LIMIT;
+                            Toast.makeText(appContext, "Receiver error. Sender disconnected.", Toast.LENGTH_SHORT).show();
+                        }
+                    } else {
+                        Log.e(TAG, "Check sender status.");
+                    }
+                    break;
+            }
+
+        }
+
+        private String downloadDataFromSender(String apiUrl) throws IOException {
+            InputStream is = null;
+            try {
+                URL url = new URL(apiUrl);
+                Log.d(TAG, "Connecting to url "+apiUrl);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setReadTimeout(10000 /* milliseconds */);
+                conn.setConnectTimeout(15000 /* milliseconds */);
+                conn.setRequestMethod("GET");
+                conn.setDoInput(true);
+                // Starts the query
+                conn.connect();
+//                int response =
+                conn.getResponseCode();
+//                Log.d(TAG, "The response is: " + response);
+                is = conn.getInputStream();
+                // Convert the InputStream into a string
+                return readIt(is);
+            } finally {
+                if (is != null) {
+                    is.close();
+                }
+            }
+        }
+
+        private String readIt(InputStream stream) throws IOException {
+            Writer writer = new StringWriter();
+
+            char[] buffer = new char[1024];
+            try {
+                Reader reader = new BufferedReader(
+                        new InputStreamReader(stream, "UTF-8"));
+                int n;
+                while ((n = reader.read(buffer)) != -1) {
+                    writer.write(buffer, 0, n);
+                }
+            } finally {
+                stream.close();
+            }
+            Log.d(TAG, "Received output "+writer.toString());
+            return writer.toString();
+        }
     }
 
     private String[] setConnectedUi(String ssid) {
@@ -296,5 +458,21 @@ public class ReceiverService extends Service {
         String ip = WifiUtils.getThisDeviceIp(getApplicationContext());
         return senderInfo;
     }
+
+    class DownloadRequestRunnable implements Runnable {
+
+        String ip;
+        String ssid;
+        DownloadRequestRunnable(String ip, String ssid) {
+            this.ip = ip;
+            this.ssid = ssid;
+        }
+        @Override
+        public void run() {
+            addSenderFilesListingFragment(ip, ssid);
+        }
+    }
+
+
 
 }
