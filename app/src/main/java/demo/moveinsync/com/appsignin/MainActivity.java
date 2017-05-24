@@ -15,6 +15,7 @@ import android.widget.EditText;
 import android.widget.Toast;
 
 import java.io.File;
+import java.util.Random;
 
 import demo.moveinsync.com.appsignin.utils.HotspotControl;
 import demo.moveinsync.com.appsignin.utils.Utils;
@@ -49,10 +50,12 @@ public class MainActivity extends AppCompatActivity {
             startService(new Intent(getApplicationContext(), SenderService.class));
             return;
         }
+        Random random = new Random();
+        int randomPort = 52000 + random.nextInt(500);
         String[] files = new String[]{"/mnt/sdcard/Downloads/BMTCWomenPassengerSecurity.apk"};
         Intent intent = new Intent(getApplicationContext(), SenderService.class);
         intent.putExtra(SHAREthemService.EXTRA_FILE_PATHS, files);
-        intent.putExtra(SHAREthemService.EXTRA_PORT, 52287);
+        intent.putExtra(SHAREthemService.EXTRA_PORT, randomPort);
         intent.putExtra(SHAREthemService.EXTRA_SENDER_NAME, "Sri");
         startService(intent);
     }
